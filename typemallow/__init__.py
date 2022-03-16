@@ -127,7 +127,7 @@ def _generate_enums_exports(context='default'):
     Generates export statements for each enum found in schemas' with 'oneof' validations
     '''
     enum_exports = []
-    for key, choices_tuple in __enums[context].items():
+    for key, choices_tuple in __enums.get(context, {}).items():
         enum_fields = []
         for choice in choices_tuple:
             enum_fields.append(
