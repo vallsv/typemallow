@@ -134,7 +134,7 @@ def _generate_enums_exports(context='default'):
         )
 
     if (len(enum_exports) > 0):
-        return f'{enum_exports}\n\n'
+        return f'{"".join(enum_exports)}\n\n'
     else:
         return ''
 
