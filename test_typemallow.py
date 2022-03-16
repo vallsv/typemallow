@@ -59,8 +59,8 @@ class TestTypemallow(unittest.TestCase):
 
         self.assertEquals(res,
 '''export interface TestSchema {
-\tenum_field?: EnumField;
 \tstring_field: string| null;
+\tenum_field?: EnumField;
 }
 
 ''')
@@ -76,8 +76,8 @@ class TestTypemallow(unittest.TestCase):
 
         self.assertEquals(res,
 '''export interface Test {
-\tenum_field?: EnumField;
 \tstring_field: string| null;
+\tenum_field?: EnumField;
 }
 
 ''')
