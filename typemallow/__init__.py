@@ -4,6 +4,15 @@ from .mappings import mappings
 __schemas = dict()
 __enums = dict()
 
+
+class _FormatterContext:
+
+    def __init__(self):
+        self.context = 'default'
+        self.strip_schema_keyword = False
+        self.oneof_as_enum = True
+
+
 def ts_interface(context='default'):
     '''
 
@@ -48,17 +57,17 @@ def _snake_to_pascal_case(key):
     return ''.join(s for s in key.replace('_', ' ').title() if not s.isspace())
 
 
-def _format_type_name(schema, strip_schema_keyword):
+def _format_type_name(schema, context):
     name = schema.__name__
-    if strip_schema_keyword:
+    if context.strip_schema_keyword:
         if name.endswith('Schema'):
             name = name[0:-len('Schema')]
     return name
 
 
-def _get_ts_type(value, strip_schema_keyword):
+def _get_ts_type(value, context):
     if isinstance(value, fields.Nested):
-        ts_type = _format_type_name(value.nested, strip_schema_keyword)
+        ts_type = _format_type_name(value.nested, context)
         if value.many:
             ts_type += '[]'
     elif isinstance(value, fields.List):
@@ -76,10 +85,10 @@ def _get_ts_type(value, strip_schema_keyword):
     elif isinstance(value, fields.Dict):
         if hasattr(value, 'key_container'):
             keys_type = mappings.get(type(value.key_container), 'any')
-            values_type = _get_ts_type(value.value_container, strip_schema_keyword)
+            values_type = _get_ts_type(value.value_container, context)
         else:
             keys_type = mappings.get(type(value.key_field), 'any')
-            values_type = _get_ts_type(value.value_field, strip_schema_keyword)
+            values_type = _get_ts_type(value.value_field, context)
         ts_type = f'{{[key: {keys_type}]: {values_type}}}'
     else:
         ts_type = mappings.get(type(value), 'any')
@@ -87,7 +96,7 @@ def _get_ts_type(value, strip_schema_keyword):
     return ts_type
 
 
-def _get_ts_interface(schema, context, strip_schema_keyword, oneof_as_enum):
+def _get_ts_interface(schema, context):
     '''
 
     Generates and returns a Typescript Interface by iterating
@@ -96,17 +105,17 @@ def _get_ts_interface(schema, context, strip_schema_keyword, oneof_as_enum):
     data type.
 
     '''
-    name = _format_type_name(schema, strip_schema_keyword)
+    name = _format_type_name(schema, context)
     ts_fields = []
 
     for key, value in schema._declared_fields.items():
-        if oneof_as_enum and value.validate and type(value.validate) is validate.OneOf:
+        if context.oneof_as_enum and value.validate and type(value.validate) is validate.OneOf:
             # add to enums to be exported with _generate_enums_exports
-            __enums[context] = {}
-            __enums[context][_snake_to_pascal_case(key)] = value.validate.choices
+            __enums[context.context] = {}
+            __enums[context.context][_snake_to_pascal_case(key)] = value.validate.choices
             ts_type = _snake_to_pascal_case(key)
         else:
-            ts_type = _get_ts_type(value, strip_schema_keyword)
+            ts_type = _get_ts_type(value, context)
 
         if value.allow_none:
             ts_type += '| null'
@@ -144,7 +153,11 @@ def _generate_enums_exports(context):
         return ''
 
 
-def generate_ts(output_path, context='default', strip_schema_keyword=False, oneof_as_enum=True):
+def generate_ts(output_path,
+                context='default',
+                strip_schema_keyword=False,
+                oneof_as_enum=True,
+                nested_inner=False):
     '''
 
     When this function is called, a Typescript interface will be generated
@@ -161,7 +174,12 @@ def generate_ts(output_path, context='default', strip_schema_keyword=False, oneo
         strip_schema_keyword: If true, the trailing "Schema" from the class name is removed
         oneof_as_enum: If true, field using oneof as genered as a dedicated enum type
     '''
+    fcontext = _FormatterContext()
+    fcontext.context = context
+    fcontext.strip_schema_keyword = strip_schema_keyword
+    fcontext.oneof_as_enum = oneof_as_enum
+
     with open(output_path, 'w') as output_file:
-        interfaces = [_get_ts_interface(schema, context, strip_schema_keyword, oneof_as_enum) for schema in __schemas[context]]
-        output_file.write(''.join(_generate_enums_exports(context)))
+        interfaces = [_get_ts_interface(schema, fcontext) for schema in __schemas[fcontext.context]]
+        output_file.write(''.join(_generate_enums_exports(fcontext.context)))
         output_file.write(''.join(interfaces))
