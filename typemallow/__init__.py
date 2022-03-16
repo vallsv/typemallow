@@ -54,16 +54,24 @@ def _get_ts_type(value):
         if value.many:
             ts_type += '[]'
     elif type(value) is fields.List:
-        item_type = value.container.__class__
+        if hasattr(value, 'container'):
+            inner = value.container
+        else:
+            inner = value.inner
+        item_type = inner.__class__
         if item_type is fields.Nested:
-            nested_type = value.container.nested.__name__
+            nested_type = inner.nested.__name__
             ts_type = f'{nested_type}[]'
         else:
             t = mappings.get(item_type, 'any')
             ts_type = f'{t}[]'
     elif type(value) is fields.Dict:
-        keys_type = mappings.get(type(value.key_container), 'any')
-        values_type = _get_ts_type(value.value_container)
+        if hasattr(value, 'key_container'):
+            keys_type = mappings.get(type(value.key_container), 'any')
+            values_type = _get_ts_type(value.value_container)
+        else:
+            keys_type = mappings.get(type(value.key_field), 'any')
+            values_type = _get_ts_type(value.value_field)
         ts_type = f'{{[key: {keys_type}]: {values_type}}}'
     else:
         ts_type = mappings.get(type(value), 'any')
