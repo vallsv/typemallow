@@ -48,9 +48,17 @@ def _snake_to_pascal_case(key):
     return ''.join(s for s in key.replace('_', ' ').title() if not s.isspace())
 
 
-def _get_ts_type(value):
+def _format_type_name(schema, strip_schema_keyword):
+    name = schema.__name__
+    if strip_schema_keyword:
+        if name.endswith('Schema'):
+            name = name[0:-len('Schema')]
+    return name
+
+
+def _get_ts_type(value, strip_schema_keyword):
     if isinstance(value, fields.Nested):
-        ts_type = value.nested.__name__
+        ts_type = _format_type_name(value.nested, strip_schema_keyword)
         if value.many:
             ts_type += '[]'
     elif isinstance(value, fields.List):
@@ -68,10 +76,10 @@ def _get_ts_type(value):
     elif isinstance(value, fields.Dict):
         if hasattr(value, 'key_container'):
             keys_type = mappings.get(type(value.key_container), 'any')
-            values_type = _get_ts_type(value.value_container)
+            values_type = _get_ts_type(value.value_container, strip_schema_keyword)
         else:
             keys_type = mappings.get(type(value.key_field), 'any')
-            values_type = _get_ts_type(value.value_field)
+            values_type = _get_ts_type(value.value_field, strip_schema_keyword)
         ts_type = f'{{[key: {keys_type}]: {values_type}}}'
     else:
         ts_type = mappings.get(type(value), 'any')
@@ -79,7 +87,7 @@ def _get_ts_type(value):
     return ts_type
 
 
-def _get_ts_interface(schema, context='default', strip_schema_keyword=False):
+def _get_ts_interface(schema, context='default', strip_schema_keyword):
     '''
 
     Generates and returns a Typescript Interface by iterating
@@ -88,10 +96,7 @@ def _get_ts_interface(schema, context='default', strip_schema_keyword=False):
     data type.
 
     '''
-    name = schema.__name__
-    if strip_schema_keyword:
-        name = name.replace('Schema', '')
-
+    name = _format_type_name(schema, strip_schema_keyword)
     ts_fields = []
 
     for key, value in schema._declared_fields.items():
@@ -101,7 +106,7 @@ def _get_ts_interface(schema, context='default', strip_schema_keyword=False):
             __enums[context][_snake_to_pascal_case(key)] = value.validate.choices
             ts_type = _snake_to_pascal_case(key)
         else:
-            ts_type = _get_ts_type(value)
+            ts_type = _get_ts_type(value, strip_schema_keyword)
 
         if value.allow_none:
             ts_type += '| null'
@@ -152,6 +157,8 @@ def generate_ts(output_path, context='default', strip_schema_keyword=False):
 
     The output file will also contain any enums found while iterating over the schemas.
 
+    Arguments:
+        strip_schema_keyword: If true, the trailing "Schema" from the class name is removed
     '''
     with open(output_path, 'w') as output_file:
         interfaces = [_get_ts_interface(schema, context, strip_schema_keyword) for schema in __schemas[context]]
