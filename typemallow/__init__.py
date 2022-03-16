@@ -49,11 +49,11 @@ def _snake_to_pascal_case(key):
 
 
 def _get_ts_type(value):
-    if type(value) is fields.Nested:
+    if isinstance(value, fields.Nested):
         ts_type = value.nested.__name__
         if value.many:
             ts_type += '[]'
-    elif type(value) is fields.List:
+    elif isinstance(value, fields.List):
         if hasattr(value, 'container'):
             inner = value.container
         else:
@@ -65,7 +65,7 @@ def _get_ts_type(value):
         else:
             t = mappings.get(item_type, 'any')
             ts_type = f'{t}[]'
-    elif type(value) is fields.Dict:
+    elif isinstance(value, fields.Dict):
         if hasattr(value, 'key_container'):
             keys_type = mappings.get(type(value.key_container), 'any')
             values_type = _get_ts_type(value.value_container)
