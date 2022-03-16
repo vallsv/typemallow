@@ -87,7 +87,7 @@ def _get_ts_type(value, strip_schema_keyword):
     return ts_type
 
 
-def _get_ts_interface(schema, context='default', strip_schema_keyword):
+def _get_ts_interface(schema, context, strip_schema_keyword, oneof_as_enum):
     '''
 
     Generates and returns a Typescript Interface by iterating
@@ -100,7 +100,7 @@ def _get_ts_interface(schema, context='default', strip_schema_keyword):
     ts_fields = []
 
     for key, value in schema._declared_fields.items():
-        if value.validate and type(value.validate) is validate.OneOf:
+        if oneof_as_enum and value.validate and type(value.validate) is validate.OneOf:
             # add to enums to be exported with _generate_enums_exports
             __enums[context] = {}
             __enums[context][_snake_to_pascal_case(key)] = value.validate.choices
@@ -122,7 +122,7 @@ def _get_ts_interface(schema, context='default', strip_schema_keyword):
     return f'export interface {name} {{\n{ts_fields}\n}}\n\n'
 
 
-def _generate_enums_exports(context='default'):
+def _generate_enums_exports(context):
     '''
     Generates export statements for each enum found in schemas' with 'oneof' validations
     '''
@@ -144,7 +144,7 @@ def _generate_enums_exports(context='default'):
         return ''
 
 
-def generate_ts(output_path, context='default', strip_schema_keyword=False):
+def generate_ts(output_path, context='default', strip_schema_keyword=False, oneof_as_enum=True):
     '''
 
     When this function is called, a Typescript interface will be generated
@@ -159,8 +159,9 @@ def generate_ts(output_path, context='default', strip_schema_keyword=False):
 
     Arguments:
         strip_schema_keyword: If true, the trailing "Schema" from the class name is removed
+        oneof_as_enum: If true, field using oneof as genered as a dedicated enum type
     '''
     with open(output_path, 'w') as output_file:
-        interfaces = [_get_ts_interface(schema, context, strip_schema_keyword) for schema in __schemas[context]]
+        interfaces = [_get_ts_interface(schema, context, strip_schema_keyword, oneof_as_enum) for schema in __schemas[context]]
         output_file.write(''.join(_generate_enums_exports(context)))
         output_file.write(''.join(interfaces))
