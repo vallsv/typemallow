@@ -11,6 +11,8 @@ class _FormatterContext:
         self.context = 'default'
         self.strip_schema_keyword = False
         self.oneof_as_enum = True
+        self.nested_inner = False
+        self.scope = 1
 
 
 def ts_interface(context='default'):
@@ -67,7 +69,12 @@ def _format_type_name(schema, context):
 
 def _get_ts_type(value, context):
     if isinstance(value, fields.Nested):
-        ts_type = _format_type_name(value.nested, context)
+        if context.nested_inner:
+            context.scope += 1
+            ts_type = _get_ts_interface(value.nested, context)
+            context.scope -= 1
+        else:
+            ts_type = _format_type_name(value.nested, context)
         if value.many:
             ts_type += '[]'
     elif isinstance(value, fields.List):
@@ -123,12 +130,17 @@ def _get_ts_interface(schema, context):
         if not value.required:
             key += '?'
 
+        indents = '\t' * context.scope
         ts_fields.append(
-            f'\t{key}: {ts_type};'
+            f'{indents}{key}: {ts_type};'
         )
 
     ts_fields = '\n'.join(ts_fields)
-    return f'export interface {name} {{\n{ts_fields}\n}}\n\n'
+    if context.scope == 1:
+        return f'export interface {name} {{\n{ts_fields}\n}}\n\n'
+    else:
+        indents = '\t' * (context.scope - 1)
+        return f'{{\n{ts_fields}\n{indents}}}'
 
 
 def _generate_enums_exports(context):
@@ -173,11 +185,13 @@ def generate_ts(output_path,
     Arguments:
         strip_schema_keyword: If true, the trailing "Schema" from the class name is removed
         oneof_as_enum: If true, field using oneof as genered as a dedicated enum type
+        nested_inner: If true, nested types are generated inside the actual interface
     '''
     fcontext = _FormatterContext()
     fcontext.context = context
     fcontext.strip_schema_keyword = strip_schema_keyword
     fcontext.oneof_as_enum = oneof_as_enum
+    fcontext.nested_inner = nested_inner
 
     with open(output_path, 'w') as output_file:
         interfaces = [_get_ts_interface(schema, fcontext) for schema in __schemas[fcontext.context]]
